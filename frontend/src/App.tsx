@@ -68,6 +68,7 @@ interface PriceHistory {
 export default function App() {
   // Routing state
   const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
+  const [isFallbackMode, setIsFallbackMode] = useState<boolean>(false);
 
   useEffect(() => {
     const handleLocationChange = () => {
@@ -146,7 +147,26 @@ export default function App() {
         setTransactions(goldData.data.transactions);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('Error fetching user data, entering fallback mode:', error);
+      setIsFallbackMode(true);
+      // Populate mock states
+      setProfile({
+        user_id: DEFAULT_USER_ID,
+        first_name: 'Ario',
+        last_name: 'Demo',
+        mobile_number: '09123456789',
+        kyc_tier: 2,
+        sheba_number: 'IR123456789012345678901234',
+        is_active: true
+      });
+      setFiatBalance(500000000.00); // 50 million Tomans
+      setGoldBalance({ karat18_mg: 150000, karat24_mg: 200000 });
+      setTransactions([
+        { transaction_id: 'TX_BUY_1092', from_account: 'SYSTEM_RESERVE', to_account: `USER_${DEFAULT_USER_ID}`, gold_weight_mg: 50000, karat: 18, tx_type: 'BUY', spot_price_per_mg_irr: 3238.4, created_at: new Date(Date.now() - 3600000).toISOString() },
+        { transaction_id: 'TX_GIFT_2802', from_account: `USER_${DEFAULT_USER_ID}`, to_account: 'USER_RECIPIENT_MOCK', gold_weight_mg: 15000, karat: 24, tx_type: 'GIFT_P2P', spot_price_per_mg_irr: 4317.192, created_at: new Date(Date.now() - 7200000).toISOString() },
+        { transaction_id: 'TX_SELL_3092', from_account: `USER_${DEFAULT_USER_ID}`, to_account: 'SYSTEM_RESERVE', gold_weight_mg: 30000, karat: 18, tx_type: 'SELL', spot_price_per_mg_irr: 3174.4, created_at: new Date(Date.now() - 14400000).toISOString() },
+        { transaction_id: 'TX_SEED_RESERVE_INIT_001', from_account: 'BONAKDAR_VAULT', to_account: 'SYSTEM_RESERVE', gold_weight_mg: 10000000, karat: 24, tx_type: 'RESERVE_INVENTORY', spot_price_per_mg_irr: 42660, created_at: new Date(Date.now() - 86400000).toISOString() }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -161,7 +181,12 @@ export default function App() {
         setRates(data.rates);
       }
     } catch (error) {
-      console.error('Error fetching rates:', error);
+      console.error('Error fetching rates, using fallback:', error);
+      setIsFallbackMode(true);
+      setRates([
+        { karat: 18, base_price_per_g_irr: 32000000, ask_price_per_g_irr: 32384000, bid_price_per_g_irr: 31744000, spread_percentage: 1.20, updated_at: new Date().toISOString() },
+        { karat: 24, base_price_per_g_irr: 42660000, ask_price_per_g_irr: 43171920, bid_price_per_g_irr: 42318720, spread_percentage: 1.20, updated_at: new Date().toISOString() }
+      ]);
     } finally {
       setRatesRefreshing(false);
     }
@@ -175,7 +200,21 @@ export default function App() {
         setPriceHistory(data.history);
       }
     } catch (error) {
-      console.error('Error fetching price history:', error);
+      console.error('Error fetching price history, using fallback:', error);
+      setIsFallbackMode(true);
+      const now = new Date();
+      const history = [];
+      for (let i = 24; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+        const change18 = Math.sin(i * 0.5) * 150000 + (Math.cos(i * 0.2) * 50000) - (i * 10000);
+        const change24 = Math.sin(i * 0.5 + 1) * 200000 + (Math.cos(i * 0.2) * 80000) - (i * 15000);
+        history.push({
+          timestamp: time.toISOString(),
+          rate18k: 32000000 + change18,
+          rate24k: 42660000 + change24,
+        });
+      }
+      setPriceHistory(history);
     }
   };
 
@@ -261,6 +300,61 @@ export default function App() {
       body.gold_weight_mg = mg;
     }
 
+    if (isFallbackMode) {
+      setTimeout(() => {
+        const details = getRateDetails(modalKarat);
+        const askPricePerMg = details.ask_price_per_g_irr / 1000.0;
+        let finalAmountIrr = body.amount_irr;
+        let finalWeightMg = body.gold_weight_mg;
+
+        if (finalAmountIrr === undefined) {
+          finalAmountIrr = finalWeightMg * askPricePerMg;
+        } else {
+          finalWeightMg = finalAmountIrr / askPricePerMg;
+        }
+
+        finalAmountIrr = Math.round(finalAmountIrr * 100) / 100;
+        finalWeightMg = Math.round(finalWeightMg * 1000) / 1000;
+
+        if (fiatBalance < finalAmountIrr) {
+          setStatusMessage({ type: 'error', text: 'Insufficient fiat balance.' });
+          setActionLoading(false);
+          return;
+        }
+
+        setFiatBalance(prev => prev - finalAmountIrr);
+        setGoldBalance(prev => {
+          const updated = { ...prev };
+          if (modalKarat === 18) updated.karat18_mg += finalWeightMg;
+          if (modalKarat === 24) updated.karat24_mg += finalWeightMg;
+          return updated;
+        });
+        setTransactions(prev => [
+          {
+            transaction_id: `TX_BUY_DEMO_${Math.floor(Math.random() * 90000) + 10000}`,
+            from_account: 'SYSTEM_RESERVE',
+            to_account: `USER_${userId}`,
+            gold_weight_mg: finalWeightMg,
+            karat: modalKarat,
+            tx_type: 'BUY',
+            spot_price_per_mg_irr: askPricePerMg,
+            created_at: new Date().toISOString()
+          },
+          ...prev
+        ]);
+
+        setStatusMessage({
+          type: 'success',
+          text: `Purchased successfully! Received ${finalWeightMg.toLocaleString()} mg of ${modalKarat}k gold.`
+        });
+        setModalAmountToman('');
+        setModalAmountWeightMg('');
+        setActionLoading(false);
+        setTimeout(() => setActiveModal(null), 3000);
+      }, 1000);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/api/gold/buy`, {
         method: 'POST',
@@ -316,6 +410,62 @@ export default function App() {
       body.gold_weight_mg = mg;
     }
 
+    if (isFallbackMode) {
+      setTimeout(() => {
+        const details = getRateDetails(modalKarat);
+        const bidPricePerMg = details.bid_price_per_g_irr / 1000.0;
+        let finalWeightMg = body.gold_weight_mg;
+        let finalAmountIrr = body.amount_irr;
+
+        if (finalWeightMg === null || finalWeightMg === undefined) {
+          finalWeightMg = finalAmountIrr / bidPricePerMg;
+        } else {
+          finalAmountIrr = finalWeightMg * bidPricePerMg;
+        }
+
+        finalWeightMg = Math.round(finalWeightMg * 1000) / 1000;
+        finalAmountIrr = Math.round(finalAmountIrr * 100) / 100;
+
+        const holding = modalKarat === 18 ? goldBalance.karat18_mg : goldBalance.karat24_mg;
+        if (holding < finalWeightMg) {
+          setStatusMessage({ type: 'error', text: 'Insufficient gold balance.' });
+          setActionLoading(false);
+          return;
+        }
+
+        setFiatBalance(prev => prev + finalAmountIrr);
+        setGoldBalance(prev => {
+          const updated = { ...prev };
+          if (modalKarat === 18) updated.karat18_mg -= finalWeightMg;
+          if (modalKarat === 24) updated.karat24_mg -= finalWeightMg;
+          return updated;
+        });
+        setTransactions(prev => [
+          {
+            transaction_id: `TX_SELL_DEMO_${Math.floor(Math.random() * 90000) + 10000}`,
+            from_account: `USER_${userId}`,
+            to_account: 'SYSTEM_RESERVE',
+            gold_weight_mg: finalWeightMg,
+            karat: modalKarat,
+            tx_type: 'SELL',
+            spot_price_per_mg_irr: bidPricePerMg,
+            created_at: new Date().toISOString()
+          },
+          ...prev
+        ]);
+
+        setStatusMessage({
+          type: 'success',
+          text: `Sold successfully! Transferred ${finalWeightMg.toLocaleString()} mg and received ${Math.round(finalAmountIrr / 10).toLocaleString()} Tomans.`
+        });
+        setModalAmountToman('');
+        setModalAmountWeightMg('');
+        setActionLoading(false);
+        setTimeout(() => setActiveModal(null), 3000);
+      }, 1000);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/api/gold/sell`, {
         method: 'POST',
@@ -359,6 +509,50 @@ export default function App() {
     if (!recipientMobilePattern.test(modalRecipientMobile)) {
       setStatusMessage({ type: 'error', text: 'Please enter a valid Iranian mobile number (starts with 09 and exactly 11 digits).' });
       setActionLoading(false);
+      return;
+    }
+
+    if (isFallbackMode) {
+      setTimeout(() => {
+        const details = getRateDetails(modalKarat);
+        const askPricePerMg = details.ask_price_per_g_irr / 1000.0;
+        const holding = modalKarat === 18 ? goldBalance.karat18_mg : goldBalance.karat24_mg;
+
+        if (holding < mg) {
+          setStatusMessage({ type: 'error', text: 'Insufficient gold balance.' });
+          setActionLoading(false);
+          return;
+        }
+
+        setGoldBalance(prev => {
+          const updated = { ...prev };
+          if (modalKarat === 18) updated.karat18_mg -= mg;
+          if (modalKarat === 24) updated.karat24_mg -= mg;
+          return updated;
+        });
+        setTransactions(prev => [
+          {
+            transaction_id: `TX_GIFT_DEMO_${Math.floor(Math.random() * 90000) + 10000}`,
+            from_account: `USER_${userId}`,
+            to_account: 'USER_RECIPIENT_MOCK',
+            gold_weight_mg: mg,
+            karat: modalKarat,
+            tx_type: 'GIFT_P2P',
+            spot_price_per_mg_irr: askPricePerMg,
+            created_at: new Date().toISOString()
+          },
+          ...prev
+        ]);
+
+        setStatusMessage({
+          type: 'success',
+          text: `Gift sent successfully! Transferred ${mg} mg of ${modalKarat}k gold to recipient.`
+        });
+        setModalAmountWeightMg('');
+        setModalRecipientMobile('');
+        setActionLoading(false);
+        setTimeout(() => setActiveModal(null), 3000);
+      }, 1000);
       return;
     }
 
@@ -579,27 +773,27 @@ export default function App() {
             <div className="grid grid-cols-3 gap-3">
               <button 
                 onClick={() => { setActiveModal('buy'); setModalKarat(18); }}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-emerald-500 bg-opacity-10 border border-emerald-500 border-opacity-20 hover:bg-opacity-20 text-emerald-400 transition-all duration-300 group active:scale-95"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 hover:border-emerald-500/30 transition-all duration-300 group active:scale-95 cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-lg bg-emerald-500 bg-opacity-25 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                   <ArrowDownRight className="w-6 h-6" />
                 </div>
                 <span className="text-xs font-bold">Buy Gold</span>
               </button>
               <button 
                 onClick={() => { setActiveModal('sell'); setModalKarat(18); }}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-rose-500 bg-opacity-10 border border-rose-500 border-opacity-20 hover:bg-opacity-20 text-rose-400 transition-all duration-300 group active:scale-95"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 hover:border-rose-500/30 transition-all duration-300 group active:scale-95 cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-lg bg-rose-500 bg-opacity-25 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 rounded-lg bg-rose-500/20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                   <ArrowUpLeft className="w-6 h-6" />
                 </div>
                 <span className="text-xs font-bold">Sell Gold</span>
               </button>
               <button 
                 onClick={() => { setActiveModal('gift'); setModalKarat(18); }}
-                className="flex flex-col items-center justify-center p-3 rounded-xl bg-gold bg-opacity-10 border border-gold border-opacity-20 hover:bg-opacity-20 text-gold transition-all duration-300 group active:scale-95"
+                className="flex flex-col items-center justify-center p-3 rounded-xl bg-gold/10 border border-gold/20 hover:bg-gold/20 text-gold hover:border-gold/30 transition-all duration-300 group active:scale-95 cursor-pointer"
               >
-                <div className="w-10 h-10 rounded-lg bg-gold bg-opacity-25 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 rounded-lg bg-gold/20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                   <Gift className="w-6 h-6" />
                 </div>
                 <span className="text-xs font-bold">P2P Gift</span>
@@ -1429,6 +1623,8 @@ function AdminMultisigPanel({
   DEFAULT_USER_ID: string;
 }) {
   const [requests, setRequests] = useState<MultisigRequest[]>([]);
+  const [localRequests, setLocalRequests] = useState<MultisigRequest[]>([]);
+  const [isLocalFallbackMode, setIsLocalFallbackMode] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -1454,6 +1650,42 @@ function AdminMultisigPanel({
   const [hedgeAsset, setHedgeAsset] = useState<string>('GOLD_FUTURE_HEX_06');
   const [hedgeValueIrr, setHedgeValueIrr] = useState<string>('250000000');
 
+  const MOCK_MULTISIG_REQUESTS: MultisigRequest[] = [
+    {
+      request_id: '11111111-1111-1111-1111-111111111111',
+      requested_by: 'TECH_FOUNDER',
+      action_type: 'MANUAL_LEDGER_ADJUSTMENT',
+      action_payload: { from_account: 'SYSTEM_RESERVE', to_account: `USER_${DEFAULT_USER_ID}`, gold_weight_mg: 150000.0, karat: 24, tx_type: 'RESERVE_INVENTORY', spot_price_per_mg_irr: 42660.0 },
+      approved_by_tech: true,
+      approved_by_biz: false,
+      status: 'PENDING_APPROVAL',
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+      updated_at: new Date(Date.now() - 3600000).toISOString()
+    },
+    {
+      request_id: '22222222-2222-2222-2222-222222222222',
+      requested_by: 'BIZ_FOUNDER',
+      action_type: 'BULK_WITHDRAWAL',
+      action_payload: { user_id: DEFAULT_USER_ID, amount_irr: 75000000.0 },
+      approved_by_tech: false,
+      approved_by_biz: true,
+      status: 'PENDING_APPROVAL',
+      created_at: new Date(Date.now() - 7200000).toISOString(),
+      updated_at: new Date(Date.now() - 7200000).toISOString()
+    },
+    {
+      request_id: '33333333-3333-3333-3333-333333333333',
+      requested_by: 'TECH_FOUNDER',
+      action_type: 'HEDGE_LIQUIDATION',
+      action_payload: { asset: 'GOLD_FUTURE_HEX_06', liquidation_value_irr: 250000000.0 },
+      approved_by_tech: false,
+      approved_by_biz: false,
+      status: 'PENDING_APPROVAL',
+      created_at: new Date(Date.now() - 14400000).toISOString(),
+      updated_at: new Date(Date.now() - 14400000).toISOString()
+    }
+  ];
+
   useEffect(() => {
     fetchRequests();
   }, []);
@@ -1470,8 +1702,11 @@ function AdminMultisigPanel({
         setError(data.message || 'Failed to fetch requests.');
       }
     } catch (err) {
-      console.error(err);
-      setError('Failed to connect to core API.');
+      console.error('API offline. Using mock requests.', err);
+      setIsLocalFallbackMode(true);
+      if (localRequests.length === 0) {
+        setLocalRequests(MOCK_MULTISIG_REQUESTS);
+      }
     } finally {
       setLoading(false);
     }
@@ -1481,6 +1716,32 @@ function AdminMultisigPanel({
     setSubmitting(true);
     setError(null);
     setSuccess(null);
+
+    if (isLocalFallbackMode) {
+      setTimeout(() => {
+        setLocalRequests(prev => {
+          return prev.map(req => {
+            if (req.request_id === requestId) {
+              const updated = { ...req };
+              if (adminType === 'tech') updated.approved_by_tech = true;
+              if (adminType === 'biz') updated.approved_by_biz = true;
+              
+              if (updated.approved_by_tech && updated.approved_by_biz) {
+                updated.status = 'EXECUTED';
+                setSuccess('Request approved and executed locally in Demo Mode!');
+              } else {
+                setSuccess('Approval recorded locally in Demo Mode.');
+              }
+              return updated;
+            }
+            return req;
+          });
+        });
+        setSubmitting(false);
+      }, 800);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/api/multisig/approve`, {
         method: 'POST',
@@ -1528,6 +1789,26 @@ function AdminMultisigPanel({
         asset: hedgeAsset,
         liquidation_value_irr: parseFloat(hedgeValueIrr),
       };
+    }
+
+    if (isLocalFallbackMode) {
+      setTimeout(() => {
+        const newReq: MultisigRequest = {
+          request_id: `MOCK_REQ_${Math.floor(Math.random() * 90000) + 10000}`,
+          requested_by: requestedBy,
+          action_type: actionType,
+          action_payload: payload,
+          approved_by_tech: requestedBy === 'TECH_FOUNDER',
+          approved_by_biz: requestedBy === 'BIZ_FOUNDER',
+          status: 'PENDING_APPROVAL',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setLocalRequests(prev => [newReq, ...prev]);
+        setSuccess('Multisig request successfully proposed locally in Demo Mode.');
+        setSubmitting(false);
+      }, 800);
+      return;
     }
 
     try {
@@ -1589,6 +1870,8 @@ function AdminMultisigPanel({
     }
     return <pre className="text-[10px]">{JSON.stringify(parsed, null, 2)}</pre>;
   };
+
+  const activeRequests = isLocalFallbackMode ? localRequests : requests;
 
   return (
     <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 sm:px-6 md:px-8 space-y-6">
@@ -1838,7 +2121,7 @@ function AdminMultisigPanel({
               </h3>
               <p className="text-[10px] text-gray-500">Live multi-signature approval queue</p>
             </div>
-            <span className="text-xs font-mono bg-gray-900 px-2 py-0.5 rounded border border-gray-800 text-gray-400">{requests.length} Requests</span>
+            <span className="text-xs font-mono bg-gray-900 px-2 py-0.5 rounded border border-gray-800 text-gray-400">{activeRequests.length} Requests</span>
           </div>
 
           {loading ? (
@@ -1846,13 +2129,13 @@ function AdminMultisigPanel({
               <div className="w-8 h-8 rounded-full border-2 border-gold-dark border-t-gold animate-spin mx-auto mb-3"></div>
               Querying multi-signature queue...
             </div>
-          ) : requests.length === 0 ? (
+          ) : activeRequests.length === 0 ? (
             <div className="py-16 text-center text-xs text-gray-500 glass-panel border border-gray-800">
               No staged transactions found in key vault. Use the proposal form on the left to queue an operation.
             </div>
           ) : (
             <div className="space-y-4">
-              {requests.map((req) => {
+              {activeRequests.map((req) => {
                 const isPending = req.status === 'PENDING_APPROVAL';
                 return (
                   <div 

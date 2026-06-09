@@ -1,25 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  --color-gold-light: #F3E5AB;
-  --color-gold: #D4AF37;
-  --color-gold-dark: #AA7C11;
-  --color-gold-glow: #FFD700;
-  
-  --color-charcoal-light: #1F2833;
-  --color-charcoal: #0B0C10;
-  --color-charcoal-dark: #050608;
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Space Grotesk", "JetBrains Mono", monospace;
 
-  --shadow-gold-glow: 0 0 15px rgba(212, 175, 55, 0.25);
-  --shadow-gold-glow-strong: 0 0 25px rgba(212, 175, 55, 0.5);
+  --color-gold-light: #F6E7B0;
+  --color-gold: #D4AF37;
+  --color-gold-dark: #B58A1C;
+  --color-gold-glow: rgba(212, 175, 55, 0.35);
+  
+  --color-charcoal-light: #161A22;
+  --color-charcoal: #0B0E14;
+  --color-charcoal-dark: #06080B;
+
+  --shadow-gold-glow: 0 0 20px rgba(212, 175, 55, 0.15);
+  --shadow-gold-glow-strong: 0 0 35px rgba(212, 175, 55, 0.35);
+  --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
 }
 
 @layer base {
   body {
     @apply bg-charcoal text-slate-100 font-sans antialiased overflow-x-hidden;
     background-image: 
-      radial-gradient(at 10% 20%, rgba(212, 175, 55, 0.03) 0px, transparent 50%),
-      radial-gradient(at 90% 80%, rgba(212, 175, 55, 0.02) 0px, transparent 50%);
+      radial-gradient(at 5% 5%, rgba(212, 175, 55, 0.04) 0px, transparent 40%),
+      radial-gradient(at 95% 95%, rgba(212, 175, 55, 0.03) 0px, transparent 40%),
+      radial-gradient(at 50% 50%, rgba(22, 26, 34, 0.8) 0px, transparent 80%);
     min-height: 100vh;
   }
 }
@@ -31,11 +36,11 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B0C10;
+  background: #06080B;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1F2833;
+  background: #232936;
   border-radius: 4px;
 }
 
@@ -43,30 +48,48 @@
   background: #D4AF37;
 }
 
-/* Glassmorphism card utility */
+/* Frosted glass utilities with subtle inner light border */
 .glass-panel {
-  @apply bg-charcoal-light/40 backdrop-blur-md border border-gray-800 rounded-2xl shadow-lg;
+  @apply bg-charcoal-light/65 backdrop-blur-xl border border-gray-800/40 rounded-2xl shadow-premium transition-all duration-300;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.03), 0 10px 30px -10px rgba(0, 0, 0, 0.7);
 }
 
 .glass-panel-gold {
-  @apply bg-charcoal-light/40 backdrop-blur-md border border-gold-dark/30 rounded-2xl shadow-gold-glow;
+  @apply bg-charcoal-light/70 backdrop-blur-xl border border-gold/20 rounded-2xl shadow-gold-glow transition-all duration-300;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 0 20px rgba(212, 175, 55, 0.08);
 }
 
-/* Gifting Card Ambient Animation */
+.glass-panel:hover {
+  @apply border-gray-700/50;
+}
+
+.glass-panel-gold:hover {
+  @apply border-gold/30;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 0 25px rgba(212, 175, 55, 0.12);
+}
+
+/* Pulse glow animation */
 @keyframes ambient-glow {
   0%, 100% {
     opacity: 0.15;
+    transform: scale(1);
   }
   50% {
-    opacity: 0.3;
+    opacity: 0.25;
+    transform: scale(1.05);
   }
 }
 
 .ambient-gold-glow {
-  animation: ambient-glow 4s ease-in-out infinite;
+  animation: ambient-glow 6s ease-in-out infinite;
 }
 
-/* Custom Text Gradients */
+/* Premium Text Gradients */
 .text-gold-gradient {
   @apply bg-clip-text text-transparent bg-gradient-to-r from-gold-light via-gold to-gold-dark;
 }
+
+.text-gold-glow {
+  text-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
+}
+
