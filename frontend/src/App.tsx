@@ -1839,37 +1839,56 @@ function AdminMultisigPanel({
   const formatPayload = (type: string, payload: any) => {
     const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
     if (type === 'MANUAL_LEDGER_ADJUSTMENT') {
+      const weight = parsed?.gold_weight_mg || 0;
+      const spotRate = parsed?.spot_price_per_mg_irr || 0;
+      const karatVal = parsed?.karat || 24;
       return (
         <div className="space-y-1 text-xs font-mono text-gray-400">
-          <p><span className="text-gold">From:</span> {parsed.from_account}</p>
-          <p><span className="text-gold">To:</span> {parsed.to_account}</p>
-          <p><span className="text-gold">Weight:</span> {parsed.gold_weight_mg?.toLocaleString()} mg ({parsed.karat}k)</p>
-          <p><span className="text-gold">Type:</span> {parsed.tx_type}</p>
-          <p><span className="text-gold">Spot Rate:</span> {Math.round(parsed.spot_price_per_mg_irr / 10).toLocaleString()} T/mg <span className="text-gray-600">({parsed.spot_price_per_mg_irr} IRR)</span></p>
+          <p><span className="text-gold">From:</span> {parsed?.from_account || 'N/A'}</p>
+          <p><span className="text-gold">To:</span> {parsed?.to_account || 'N/A'}</p>
+          <p><span className="text-gold">Weight:</span> {weight.toLocaleString()} mg ({karatVal}k)</p>
+          <p><span className="text-gold">Type:</span> {parsed?.tx_type || 'N/A'}</p>
+          <p><span className="text-gold">Spot Rate:</span> {Math.round(spotRate / 10).toLocaleString()} T/mg <span className="text-gray-600">({spotRate.toLocaleString()} IRR)</span></p>
           <p className="text-slate-100 font-sans mt-2 pt-2 border-t border-gray-800">
-            Total Value: <strong className="text-gold font-mono">{Math.round((parsed.gold_weight_mg * parsed.spot_price_per_mg_irr) / 10).toLocaleString()} Tomans</strong>
+            Total Value: <strong className="text-gold font-mono">{Math.round((weight * spotRate) / 10).toLocaleString()} Tomans</strong>
           </p>
         </div>
       );
     }
     if (type === 'BULK_WITHDRAWAL') {
+      const amount = parsed?.amount_irr || 0;
       return (
         <div className="space-y-1 text-xs font-mono text-gray-400">
-          <p><span className="text-gold">User ID:</span> {parsed.user_id}</p>
-          <p><span className="text-gold">Amount:</span> {Math.round(parsed.amount_irr / 10).toLocaleString()} Tomans <span className="text-gray-600">({parsed.amount_irr.toLocaleString()} IRR)</span></p>
+          <p><span className="text-gold">User ID:</span> {parsed?.user_id || 'N/A'}</p>
+          <p><span className="text-gold">Amount:</span> {Math.round(amount / 10).toLocaleString()} Tomans <span className="text-gray-600">({amount.toLocaleString()} IRR)</span></p>
         </div>
       );
     }
     if (type === 'HEDGE_LIQUIDATION') {
+      if (parsed && (parsed.estimated_cost_irr !== undefined || parsed.gold_weight_grams !== undefined)) {
+        const cost = parsed.estimated_cost_irr || 0;
+        const weightG = parsed.gold_weight_grams || 0;
+        const treasury = parsed.treasury_balance_irr || 0;
+        return (
+          <div className="space-y-1 text-xs font-mono text-gray-400">
+            <p><span className="text-gold">Deficit Karat:</span> {parsed.karat || 24}k</p>
+            <p><span className="text-gold">Deficit Weight:</span> {weightG.toLocaleString()} g</p>
+            <p><span className="text-gold">Estimated Wholesaler Cost:</span> {Math.round(cost / 10).toLocaleString()} Tomans <span className="text-gray-600">({cost.toLocaleString()} IRR)</span></p>
+            <p><span className="text-gold">Treasury Balance:</span> {Math.round(treasury / 10).toLocaleString()} Tomans <span className="text-gray-600">({treasury.toLocaleString()} IRR)</span></p>
+          </div>
+        );
+      }
+      const liqVal = parsed?.liquidation_value_irr || 0;
       return (
         <div className="space-y-1 text-xs font-mono text-gray-400">
-          <p><span className="text-gold">Asset Ref:</span> {parsed.asset}</p>
-          <p><span className="text-gold">Liquidation Val:</span> {Math.round(parsed.liquidation_value_irr / 10).toLocaleString()} Tomans <span className="text-gray-600">({parsed.liquidation_value_irr.toLocaleString()} IRR)</span></p>
+          <p><span className="text-gold">Asset Ref:</span> {parsed?.asset || 'N/A'}</p>
+          <p><span className="text-gold">Liquidation Val:</span> {Math.round(liqVal / 10).toLocaleString()} Tomans <span className="text-gray-600">({liqVal.toLocaleString()} IRR)</span></p>
         </div>
       );
     }
     return <pre className="text-[10px]">{JSON.stringify(parsed, null, 2)}</pre>;
   };
+
 
   const activeRequests = isLocalFallbackMode ? localRequests : requests;
 
