@@ -1,0 +1,29 @@
+{
+  "name": "mellizarr-db-initializer",
+  "version": "1.0.0",
+  "description": "PostgreSQL database initialization and seed scripts for MelliZarr",
+  "main": "init-db.ts",
+  "scripts": {
+    "db:init": "ts-node init-db.ts",
+    "db:seed": "ts-node seed.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "pg": "^8.11.5",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.11.30",
+    "@types/pg": "^8.11.4",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.3"
+  }
+}
