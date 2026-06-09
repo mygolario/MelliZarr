@@ -526,7 +526,6 @@ export default function App() {
         <AdminMultisigPanel 
           API_BASE={API_BASE} 
           DEFAULT_USER_ID={DEFAULT_USER_ID}
-          navigateTo={navigateTo}
         />
       ) : (
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 sm:px-6 md:px-8 space-y-6">
@@ -1425,11 +1424,9 @@ interface MultisigRequest {
 function AdminMultisigPanel({
   API_BASE,
   DEFAULT_USER_ID,
-  navigateTo,
 }: {
   API_BASE: string;
   DEFAULT_USER_ID: string;
-  navigateTo: (path: string) => void;
 }) {
   const [requests, setRequests] = useState<MultisigRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
